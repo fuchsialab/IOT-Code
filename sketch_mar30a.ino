@@ -2,13 +2,13 @@
 #include <DHT.h>
 #include "FirebaseESP8266.h"	
 #include <ESP8266WiFi.h>
-#include "MAX30100_PulseOximeter.h"
+//#include "MAX30100_PulseOximeter.h"
 
-#define REPORTING_PERIOD_MS     1000
+//#define REPORTING_PERIOD_MS    1000
 
-PulseOximeter pox;
+//PulseOximeter pox;
 
-uint32_t tsLastReport = 0;
+//uint32_t tsLastReport = 0;
 
 #define FIREBASE_HOST "iotweather-f233f-default-rtdb.firebaseio.com/" 
 #define FIREBASE_AUTH "mBkvm7ZeFvWePM0mSYBUcdgj3k80TUK9tVs2uozL"
@@ -24,18 +24,18 @@ FirebaseData ledData;
 FirebaseJson json;
 
 float limtmax, limtmin, limhmax, limhmin, limgmax, limgmin ;
-int btnstate;
+int btnstate, SpO2, BPM; 
 
 
-void onBeatDetected()
-{
-    Serial.println("Beat!");
-}
+// void onBeatDetected()
+// {
+//     Serial.println("Beat!");
+// }
 
 void setup()
 {
 
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   pinMode(D8, OUTPUT);
   pinMode(D6, INPUT);
@@ -49,6 +49,15 @@ void setup()
     Serial.print(".");
     delay(300);
   }
+
+  // if(!pox.begin()) {
+  //     Serial.println("FAILED");
+  //     for(;;);
+  // } else {
+  //     Serial.println("SUCCESS");
+  // }
+  // pox.setOnBeatDetectedCallback(onBeatDetected);
+
   Serial.println();
   Serial.print("Connected with IP: ");
   Serial.println(WiFi.localIP());
@@ -56,15 +65,6 @@ void setup()
 
   Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
   Firebase.reconnectWiFi(true);
-
-  if (!pox.begin()) {
-    Serial.println("MAX30100 was not found. Please check the wiring/power.");
-    for (;;);
-  } else {
-    Serial.println("SUCCESS");
-  }
-
-  pox.setOnBeatDetectedCallback(onBeatDetected);
 
 }
 
@@ -74,14 +74,11 @@ void sensorUpdate(){
   float t = dht.readTemperature();
   float f = dht.readTemperature(true);
   float g = analogRead(A0);
-  float spo2, heart; 
 
-
-
+ 
    if (Firebase.getInt(firebaseData, "/tempmax")) {
 
       if (firebaseData.dataTypeEnum() == fb_esp_rtdb_data_type_integer) {
-      Serial.println(firebaseData.to<int>());
       limtmax = firebaseData.to<int>();
     
     }
@@ -93,7 +90,6 @@ void sensorUpdate(){
     if (Firebase.getInt(firebaseData, "/tempmin")) {
 
       if (firebaseData.dataTypeEnum() == fb_esp_rtdb_data_type_integer) {
-      Serial.println(firebaseData.to<int>());
       limtmin = firebaseData.to<int>();
     
     }
@@ -105,7 +101,6 @@ void sensorUpdate(){
     if (Firebase.getInt(firebaseData, "/hummax")) {
 
       if (firebaseData.dataTypeEnum() == fb_esp_rtdb_data_type_integer) {
-      Serial.println(firebaseData.to<int>());
       limhmax = firebaseData.to<int>();
     
     }
@@ -117,7 +112,6 @@ void sensorUpdate(){
     if (Firebase.getInt(firebaseData, "/hummin")) {
 
       if (firebaseData.dataTypeEnum() == fb_esp_rtdb_data_type_integer) {
-      Serial.println(firebaseData.to<int>());
       limhmin = firebaseData.to<int>();
     
     }
@@ -129,7 +123,6 @@ void sensorUpdate(){
     if (Firebase.getInt(firebaseData, "/gasmax")) {
 
       if (firebaseData.dataTypeEnum() == fb_esp_rtdb_data_type_integer) {
-      Serial.println(firebaseData.to<int>());
       limgmax = firebaseData.to<int>();
     
     }
@@ -141,7 +134,6 @@ void sensorUpdate(){
     if (Firebase.getInt(firebaseData, "/gasmin")) {
 
       if (firebaseData.dataTypeEnum() == fb_esp_rtdb_data_type_integer) {
-      Serial.println(firebaseData.to<int>());
       limgmin = firebaseData.to<int>();
     
     }
@@ -161,40 +153,6 @@ void sensorUpdate(){
   Serial.print("Gas Content: ");
   Serial.print(g); 
 
-  pox.update();
-
-    // Asynchronously dump heart rate and oxidation levels to the serial
-    // For both, a value of 0 means "invalid"
-  if (millis() - tsLastReport > REPORTING_PERIOD_MS) {
-
-      heart = pox.getHeartRate();
-      spo2 = pox.getSpO2();
-
-      if (Firebase.setFloat(firebaseData, "/spo2", spo2)){
-        Serial.println("PASSED");
-        Serial.println("PATH: " + firebaseData.dataPath());
-        Serial.println("TYPE: " + firebaseData.dataType());
-        Serial.println("ETag: " + firebaseData.ETag());
-        Serial.println("------------------------------------");
-        Serial.println();
-      }
-      else{
-        Serial.println("FAILED");
-        Serial.println("REASON: " + firebaseData.errorReason());
-        Serial.println("------------------------------------");
-        Serial.println();
-      }
-
-      
-      Serial.print("Heart rate:");
-      Serial.print(heart);
-      Serial.print("bpm / SpO2:");
-      Serial.print(spo2);
-      Serial.println("%");
-
-      tsLastReport = millis();
-  }
-
 
   if(h>limhmax || h<limhmin || t>limtmax || t<limtmin || g>limgmax || g<limgmin){
 
@@ -207,63 +165,36 @@ void sensorUpdate(){
 
   }
 
-
   if (Firebase.setFloat(firebaseData, "/temperature", t))
-  {
-    Serial.println("PASSED");
-    Serial.println("PATH: " + firebaseData.dataPath());
-    Serial.println("TYPE: " + firebaseData.dataType());
-    Serial.println("ETag: " + firebaseData.ETag());
-    Serial.println("------------------------------------");
-    Serial.println();
-  }
+  {}
   else
   {
     Serial.println("FAILED");
-    Serial.println("REASON: " + firebaseData.errorReason());
-    Serial.println("------------------------------------");
-    Serial.println();
+  
   }
 
   if (Firebase.setFloat(firebaseData, "/humidity", h))
-  {
-    Serial.println("PASSED");
-    Serial.println("PATH: " + firebaseData.dataPath());
-    Serial.println("TYPE: " + firebaseData.dataType());
-    Serial.println("ETag: " + firebaseData.ETag());
-    Serial.println("------------------------------------");
-    Serial.println();
-  }
+  {}
   else
   {
     Serial.println("FAILED");
-    Serial.println("REASON: " + firebaseData.errorReason());
-    Serial.println("------------------------------------");
-    Serial.println();
+
   }
   if (Firebase.setFloat(firebaseData, "/gas", g))
-  {
-    Serial.println("PASSED");
-    Serial.println("PATH: " + firebaseData.dataPath());
-    Serial.println("TYPE: " + firebaseData.dataType());
-    Serial.println("ETag: " + firebaseData.ETag());
-    Serial.println("------------------------------------");
-    Serial.println();
-  }
+  {}
   else
   {
     Serial.println("FAILED");
-    Serial.println("REASON: " + firebaseData.errorReason());
-    Serial.println("------------------------------------");
-    Serial.println();
+  
   }
+    Serial.println("");
   
 }
 
 void btnUpdate(){
 
  int btn = digitalRead(D6);
- Serial.println(btn);
+ //Serial.println(btn);
 
  if (Firebase.getInt(firebaseData, "/buttonalarm")) {
 
@@ -285,13 +216,40 @@ void btnUpdate(){
           
       }
     }
-
 }
 
+// void spo2Update(){
+
+//   pox.update();
+ 
+//     BPM = pox.getHeartRate();
+//     SpO2 = pox.getSpO2();
+
+//     if (millis() - tsLastReport > REPORTING_PERIOD_MS)
+//     {
+//         Serial.print("Heart rate:");
+//         Serial.print(BPM);
+//         Serial.print("   ");
+//         Serial.print("SpO2:");
+//         Serial.print(SpO2);
+//         Serial.println("%");
+        
+//         tsLastReport = millis();
+
+//          if (BPM != 0 && SpO2 !=0) {
+//             Firebase.setInt(firebaseData, "/spo2", SpO2);
+//             Firebase.setInt(firebaseData, "/bpm", BPM);
+           
+//         }
+//     }
+
+// }
 
 void loop() {
+
+  //  spo2Update();
     btnUpdate();
     sensorUpdate();
-   // delay(500);
+  
 }
 
